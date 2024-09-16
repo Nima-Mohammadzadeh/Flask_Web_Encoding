@@ -1,4 +1,4 @@
-from flask import render_template, flash, redirect
+from flask import render_template, flash, redirect, url_for
 from app import app
 from app.forms import DatabaseForm
 
@@ -14,7 +14,7 @@ def job_setup():
     if form.validate_on_submit():
         flash('Databse Requested')
 
-        return redirect('/index')
+        return redirect(url_for('Home'))
 
     return render_template('job-setup.html', title='Job Setup', form=form )
 
