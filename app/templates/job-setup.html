@@ -7,15 +7,24 @@
         <p>
             {{ form.serial.label }}<br>
             {{ form.serial(size=32) }}
+            {% for error in form.serial.errors %}<br>
+            <span style ="color: red;">[{{ error }}]</span>
+            {% endfor %}
         </p>
         <p>
             {{ form.UPC.label  }}<br>
             {{ form.UPC(size=32) }}
+            {% for error in form.UPC.errors %}<br>
+            <span style ="color: red;">[{{ error }}]</span>
+            {% endfor %}
         </p>
         
         <p> 
             {{ form.quantity.label }}<br>
             {{ form.quantity(size=32) }}
+            {% for error in form.quantity.errors %}<br>
+            <span style ="color: red;">[{{ error }}]</span>
+            {% endfor %}
         </p>
 
         <p>{{ form.two_percent.label }}{{ form.two_percent() }} </p>
