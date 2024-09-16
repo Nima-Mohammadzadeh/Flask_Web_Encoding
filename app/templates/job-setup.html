@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Job setup</h1>
+    <form action="" method="post" novalidate>
+        {{ form.hidden_tag() }}
+        <p>
+            {{ form.serial.label }}<br>
+            {{ form.serial(size=32) }}
+        </p>
+        <p>
+            {{ form.UPC.label  }}<br>
+            {{ form.UPC(size=32) }}
+        </p>
+        
+        <p> 
+            {{ form.quantity.label }}<br>
+            {{ form.quantity(size=32) }}
+        </p>
+
+        <p>{{ form.two_percent.label }}{{ form.two_percent() }} </p>
+        <p>{{ form.seven_percent.label }}{{ form.seven_percent() }}</p>
+        <p>{{ form.submit() }}</p>
+    </form>
+{% endblock %}
