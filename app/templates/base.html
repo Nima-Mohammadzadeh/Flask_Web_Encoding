@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+    <head>
+        {% if title %}
+            <title>{{ title }} - Encoding</title>
+        {% else %}
+            <title>Encoding</title>
+        {% endif %}
+    </head>
+    <body>
+        <div>Encoding: <a href="/index">Home</a>
+        <a href="/Job setup">Job setup</a>
+        </div>
+        
+        <hr>
+        
+        {% block content %}{% endblock %}
+    </body>
+</html>
