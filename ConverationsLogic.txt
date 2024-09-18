@@ -1,0 +1,45 @@
+
+
+def dec_to_bin(value, length):
+    return bin(int(value))[2:].zfill(length)
+
+def bin_to_hex(binary_str):
+    hex_str = hex(int(binary_str, 2))[2:].upper()
+    return hex_str.zfill(len(binary_str) // 4)
+
+def generate_epc(upc, serial_number):
+    gs1_company_prefix = "0" + upc[:6]
+    item_reference_number = upc[6:11]
+    gtin14 = "0" + gs1_company_prefix + item_reference_number
+    header = "00110000"
+    filter_value = "001"
+    partition = "101"
+    gs1_binary = dec_to_bin(gs1_company_prefix, 24)
+    item_reference_binary = dec_to_bin(item_reference_number, 20)
+    serial_binary = dec_to_bin(serial_number, 38)
+    epc_binary = header + filter_value + partition + gs1_binary + item_reference_binary + serial_binary
+    epc_hex = bin_to_hex(epc_binary)
+    return epc_hex
+
+def open_roll_tracker(upc, start_serial, end_serial, lpr, total_qty, qty_db):
+    try:
+        roll_tracker_path = os.path.join(os.path.dirname(__file__), 'Roll Tracker v.3.xlsx')
+        if not os.path.exists(roll_tracker_path):
+            messagebox.showerror("File Error", f"Roll Tracker file not found at: {roll_tracker_path}")
+            return
+        wb = openpyxl.load_workbook(roll_tracker_path)
+        input_sheet = wb['Input']
+        input_sheet['D3'] = lpr
+        input_sheet['D4'] = total_qty
+        input_sheet['D5'] = start_serial
+        input_sheet['D8'] = end_serial
+        input_sheet['D10'] = qty_db
+        hex_sheet = wb['HEX']
+        wb.active = wb.index(hex_sheet)
+        temp_path = os.path.join(os.path.dirname(__file__), 'temp_Roll_Tracker.xlsx')
+        wb.save(temp_path)
+        os.startfile(temp_path)
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {str(e)}")
+
+

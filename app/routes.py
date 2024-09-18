@@ -19,7 +19,6 @@ def job_setup():
     current_serial = db.session.scalar(select(serialNumber.CurrentSerial))
     form.serial.data = current_serial
 
-
    
 
     if form.validate_on_submit():
