@@ -43,3 +43,60 @@ def open_roll_tracker(upc, start_serial, end_serial, lpr, total_qty, qty_db):
         messagebox.showerror("Error", f"An error occurred: {str(e)}")
 
 
+def generate_file():
+    upc = upc_entry.get().strip()
+    start_serial = serial_start_entry.get().strip()
+    lpr = lpr_entry.get().strip()
+    qty_db = qty_db_entry.get().strip()
+    save_location = save_location_entry.get().strip()
+    total_qty = calculate_total_quantity()
+
+    if not upc or not start_serial or not lpr or not total_qty or not qty_db or not save_location:
+        messagebox.showerror("Input Error", "All fields are required.")
+        return
+
+    if not validate_upc(upc):
+        return
+
+    try:
+        start_serial = int(start_serial)
+        total_qty = int(total_qty)
+        lpr = int(lpr)
+        qty_db = int(qty_db)
+    except ValueError:
+        messagebox.showerror("Input Error", "Serial numbers and quantities must be integers.")
+        return
+
+    end_serial = start_serial + total_qty - 1
+    num_serials = end_serial - start_serial + 1
+    num_dbs = math.ceil(num_serials / qty_db)
+    
+    try:
+        progress_bar['maximum'] = num_dbs
+        for db_index in range(num_dbs):
+            chunk_start = start_serial + db_index * qty_db
+            chunk_end = min(chunk_start + qty_db - 1, end_serial)
+            chunk_serial_numbers = list(range(chunk_start, chunk_end + 1))
+            epc_values = [generate_epc(upc, sn) for sn in chunk_serial_numbers]
+
+            df = pd.DataFrame({
+                'UPC': [upc] * len(chunk_serial_numbers),
+                'Serial #': chunk_serial_numbers,
+                'EPC': epc_values
+            })
+
+            
+            file_name = f"{upc}.DB{db_index + 1}.{start_range}K-{end_range}K.xlsx"
+            file_path = os.path.join(save_location, file_name)
+            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Sheet1')
+                worksheet = writer.sheets['Sheet1']
+                worksheet.column_dimensions['C'].width = 40
+
+            progress_bar['value'] = db_index + 1
+            root.update_idletasks()
+
+        open_roll_tracker(upc, start_serial, end_serial, lpr, total_qty, qty_db)
+        messagebox.showinfo("Success", f"Files saved successfully in: {save_location}")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {str(e)}")
