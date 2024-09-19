@@ -7,6 +7,8 @@ from app import db
 from io import BytesIO
 from flask import send_file
 import openpyxl
+from utils import helpers
+
 
 @app.route('/')
 @app.route('/index')
@@ -18,19 +20,18 @@ def Home():
 def job_setup():
 
     form = DatabaseForm()
-    qty = form.quantity.data
+    
     current_serial = db.session.scalar(select(serialNumber.CurrentSerial))
     form.serial.data = current_serial
 
    
 
     if form.validate_on_submit():
-        if form.two_percent.data:            
-            qty += int(qty * 0.02)
-        if form.seven_percent.data:
-            qty += int(qty * 0.07)
+        qty = form.quantity.data           
+        adjusted_qty = helpers.calculate_adjusted_quantity(qty, form.two_percent.data, form.seven_percent.data)
+           
 
-        new_serial = current_serial + qty
+        new_serial = current_serial + adjusted_qty
         serialNumber.query.update({serialNumber.CurrentSerial: new_serial})
         db.session.commit()
 
