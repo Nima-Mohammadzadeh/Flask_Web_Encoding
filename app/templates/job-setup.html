@@ -30,6 +30,13 @@
         <p>{{ form.two_percent.label }}{{ form.two_percent() }} </p>
         <p>{{ form.seven_percent.label }}{{ form.seven_percent() }}</p>
         
-        <p>{{ form.submit() }}</p>
+        <p>{{ form.submit() }} <button type ="button" onclick="openRollTracker()">Go to Roll Tracker</button></p>
     </form>
+
+    <script>
+        function openRollTracker() {
+            window.open("{{ url_for('roll_tracker') }}", "_self");
+        }
+    </script>
+
 {% endblock %}

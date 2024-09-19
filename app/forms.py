@@ -18,6 +18,7 @@ class DatabaseForm(FlaskForm):
     two_percent = BooleanField('2%')
     seven_percent = BooleanField('7%')
     submit = SubmitField('Generate')
+    
 
     def validate_UPC(self, field):
         if not field.data.isdigit():

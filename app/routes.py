@@ -23,29 +23,32 @@ def job_setup():
     
     current_serial = db.session.scalar(select(serialNumber.CurrentSerial))
     form.serial.data = current_serial
-
-   
+  
 
     if form.validate_on_submit():
-        qty = form.quantity.data           
-        adjusted_qty = helpers.calculate_adjusted_quantity(qty, form.two_percent.data, form.seven_percent.data)
-           
+        if form.submit.data:
 
-        new_serial = current_serial + adjusted_qty
-        serialNumber.query.update({serialNumber.CurrentSerial: new_serial})
-        db.session.commit()
+            qty = form.quantity.data           
+            adjusted_qty = helpers.calculate_adjusted_quantity(qty, form.two_percent.data, form.seven_percent.data)
+            
 
-        return redirect(url_for('download'), code=307)
+            new_serial = current_serial + adjusted_qty
+            serialNumber.query.update({serialNumber.CurrentSerial: new_serial})
+            db.session.commit()
+
+            return redirect(url_for('download'), code=307)
         
+        
+
     return render_template('job-setup.html', title='Job Setup', form=form )
+
 
 
 @app.route('/download', methods=['POST'])
 def download():
     form = DatabaseForm(request.form)
     if form.validate():
-        excel_file = form.generate_excel_file()  # Remove the 'form' argument here
-
+        excel_file = form.generate_excel_file()
         return send_file(
             excel_file, 
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -55,3 +58,9 @@ def download():
     else:
         flash('Error in form')
         return redirect(url_for('job_setup'))
+    
+
+
+@app.route('/roll_tracker')
+def roll_tracker():
+    return render_template('roll-tracker.html', title='Roll Tracker')
