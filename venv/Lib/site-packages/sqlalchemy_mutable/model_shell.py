@@ -1,0 +1,60 @@
+"""Classes for storing and recovering models.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Type
+
+from sqlalchemy import orm
+from sqlalchemy.inspection import inspect
+
+
+class Query:  # pylint: disable=too-few-public-methods
+    """Proxy for sqlalchemy.orm.Query objects.
+
+    Args:
+        scoped_session (orm.scoping.scoped_session): Session to query.
+
+    Attributes:
+        scoped_session (orm.scoping.scoped_session): Session to query.
+    """
+
+    def __init__(self, scoped_session: orm.scoping.scoped_session) -> None:
+        self.scoped_session = scoped_session
+
+    def __get__(self, obj: Any, model_cls: Type) -> orm.Query:
+        """Return Query object for use with model_class.get()"""
+        return orm.Query(model_cls, self.scoped_session())
+
+
+class ModelShell:
+    """Temporary store for models when a mutable object is being pickled.
+
+    Args:
+        model (Any): Model to store.
+
+    Attributes:
+        model_class (Type): Class of the stored model.
+        identity (List): SQLAlchemy identity of the model.
+    """
+
+    def __init__(self, model: Any) -> None:
+        self.model_class = model.__class__
+        self.identity = inspect(model).identity
+
+    def __repr__(self):
+        return f"<Shell {repr(self.unshell())}"
+
+    def __str__(self):
+        return str(self.unshell())
+
+    def unshell(self) -> Any:
+        """Restore the model by querying the database.
+
+        Returns:
+            Any: The original model.
+        """
+        if hasattr(self.model_class, "query"):
+            return self.model_class.query.get(self.identity)
+
+        return self.model_class, self.identity

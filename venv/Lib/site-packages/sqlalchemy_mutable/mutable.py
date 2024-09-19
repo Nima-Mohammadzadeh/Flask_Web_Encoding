@@ -1,0 +1,588 @@
+"""Mutable class for wrapping objects whose changes should be tracked by the database.
+"""
+from __future__ import annotations
+
+import math
+from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
+import sqlalchemy
+
+from sqlalchemy.ext.mutable import Mutable as MutableBase
+from sqlalchemy.inspection import inspect
+
+from .model_shell import ModelShell
+
+# Note: reference for dunder methods: https://rszalski.github.io/magicmethods/
+
+IMMUTABLE_TYPES = (
+    str,
+    int,
+    float,
+    complex,
+    frozenset,
+    bool,
+    bytes,
+)
+
+MutableType = TypeVar("MutableType", bound="Mutable")
+
+
+class Mutable(MutableBase):
+    """Mutable wrapper.
+
+    This class wraps any (pickle or JSON) serializable object and tracks changes to it.
+
+    Args:
+        obj (Any): The object whose changes you want to track.
+        root (Mutable, optional): The "root" object with which changes to ``obj`` will
+            be registered. If None, the object itself is assumed to be the root.
+            Defaults to None.
+
+    Attributes:
+        root (Mutable): The root mutable object.
+        _object (Any): Usually ``obj`` or a shallow copy of it. You may wish to use this
+            attribute, but the ``get_object`` method is usually preferred.
+    """
+
+    _object = None
+    _session: sqlalchemy.orm.scoping.scoped_session = None
+    _tracked_classes: Dict[Type, Type] = {}
+    _untracked_attr_names: List[str] = [
+        "__dict__",
+        "_object",
+        "_deserializing",
+        "_session",
+        "_tracked_attr_names",
+        "_tracked_classes",
+        "root",
+    ]
+
+    @classmethod
+    def coerce(cls, key: str, value: Any) -> Optional[Mutable]:
+        """Wraps the value in the Mutable class.
+
+        Args:
+            key (str): Name of the attribute being coerced.
+            value (Any): Value to be coerced.
+
+        Returns:
+            Optional[Mutable]: A mutable wrapper which tracks changes to the value.
+        """
+        if value is None:
+            return None
+        return cls(value)
+
+    @classmethod
+    def register_class(cls, origin_class: Type) -> Callable:
+        """Decorator function that registers a mutable class with an existing class.
+
+        When a mutable wrapper detects that an attribute or item of its object is set
+        to an object of type ``origin_class``, it automatically converts it to an
+        instance of the decorated class.
+
+        Args:
+            origin_class (Type): Existing class to map.
+
+        Returns:
+            Callable: Decorator function.
+        """
+
+        def register(tracked_class):
+            cls._tracked_classes[origin_class] = tracked_class
+            return tracked_class
+
+        return register
+
+    @classmethod
+    def set_session(
+        cls, session: sqlalchemy.orm.scoping.scoped_session
+    ) -> sqlalchemy.orm.scoping.scoped_session:
+        """Associate mutation tracking with a SQLAlchemy session.
+
+        Args:
+            session (sqlalchemy.orm.scoping.scoped_session): Associated session.
+
+        Returns:
+            sqlalchemy.orm.scoping.scoped_session: Associated session.
+
+        Note:
+            Setting the session helps when storing database models wrapped in the
+            mutable class. When the session is committed, the mutable object is pickled.
+            However, database models are not pickle serializable. I solve this problem
+            by storing the model metadata in pickle-able "model shell". The model is
+            restored when the mutable object is next accessed. To shell a model, the
+            model needs to have an identity. If you have set the session, the mutable
+            object will give your model an identity, if it doesn't already have one,
+            when wrapping it in a mutable class. Otherwise, you must add and commit your
+            model to the database before wrapping it in a mutable class.
+        """
+        cls._session = session
+        return session
+
+    def __new__(cls, obj: Any = None, root: Mutable = None) -> Mutable:
+        if (obj is None or isinstance(obj, IMMUTABLE_TYPES)) and root is not None:
+            # immutable objects don't require mutation tracking
+            # so just return the immutable object
+            return obj
+
+        if isinstance(obj, cls):
+            obj.set_root(root)
+            return obj
+
+        # create a new object of the appropriate mutable type and initialize attributes
+        new_class = cls
+        if cls is Mutable:
+            # find the appropriate tracked class for this object
+            new_class = cls._tracked_classes.get(type(obj), cls)
+        new = super().__new__(new_class)
+        new._tracked_attr_names = set()
+        new._deserializing = False
+        new.root = new if root is None else root
+        new._object = new.convert_object(obj, new.root)
+
+        if new.object_is_model():
+            # models must have an identity when wrapped in a mutable object
+            # if the model does not have an identity, use the class's `session`
+            # attribute to flush it with the database
+            if inspect(new._object).identity is None:
+                if cls._session is None:
+                    raise ValueError(
+                        " ".join(
+                            [
+                                f"Model {new._object} does not have an identity. Either",
+                                "commit the model before converting it to a mutable object",
+                                "or give Mutable a session with its `set_session` class",
+                                "method.",
+                            ]
+                        )
+                    )
+                cls._session.add(new._object)
+                cls._session.flush([new._object])
+        else:
+            # Infer that the object already has set attributes if the object has these attributes
+            # but a new instance of the object's class does not
+            try:
+                tracked_attr_names = set(dir(obj)) - set(
+                    dir(obj.__class__.__new__(obj.__class__))
+                )
+                for name in tracked_attr_names:
+                    setattr(new, name, Mutable(getattr(obj, name), root))
+            except TypeError:
+                # this exception is most likely triggered when the object's __new__
+                # method requires additional arguments
+                pass
+
+        return new
+
+    def __getattribute__(self, name):
+        if name == "_untracked_attr_names" or name in self._untracked_attr_names:
+            return super().__getattribute__(name)
+
+        if hasattr(self, "_object") and hasattr(self._object, "__table__"):
+            # the object is a model, so try to set the model's attribute before the
+            # Mutable object's attribute
+            obj = self._object
+            if name in obj.__dict__:
+                return getattr(obj, name)
+
+        if name in self._tracked_attr_names:
+            return getattr(self._object, name)
+
+        try:
+            # assume the attribute belongs to the mutable wrapper
+            return super().__getattribute__(name)
+        except AttributeError:
+            # assume the attribute belongs to the underlying object
+            return getattr(self._object, name)
+
+    def __setattr__(self, name, value):
+        if name in self._untracked_attr_names:
+            super().__setattr__(name, value)
+            return
+
+        if self.object_is_model():
+            setattr(self._object, name, value)
+            return
+
+        self._changed()
+        setattr(self._object, name, Mutable(value, root=self.root))
+        self._tracked_attr_names.add(name)
+
+    def __delattr__(self, name):
+        if name not in self._tracked_attr_names:
+            return super().__delattr__(name)
+
+        if not self.object_is_model():
+            self._changed()
+            self._tracked_attr_names.remove(name)
+
+        return self._object.__delattr__(name)
+
+    def __getitem__(self, key):
+        return self._object[key]
+
+    def __setitem__(self, key, item):
+        if isinstance(key, slice):
+            # note that this line assumes the item class's constructor can accept a
+            # generator as its argument
+            # if this is incorrect, you will have to overload the __setitem__ operator
+            self._object[key] = type(item)((self._convert_item(i) for i in item))
+        else:
+            self._object[key] = self._convert_item(item)
+        self._changed()
+
+    def __delitem__(self, key):
+        self._changed()
+        del self._object[key]
+
+    def _convert_item(self, item, root=None):
+        """Convert an item to a mutable object for setitem and related operations.
+
+        Args:
+            item (Any): Item to convert.
+            root (Mutable, optional). Root mutable object. Defaults to None.
+
+        Returns:
+            Mutable: Converted item.
+        """
+        return Mutable(item, root or self.root)
+
+    def __repr__(self):
+        return (
+            f"<Mutable {repr(self._object)}>"
+            if hasattr(self, "_object")
+            else super().__repr__()
+        )
+
+    def __str__(self):
+        return str(self.get_object()) if hasattr(self, "_object") else super().__str__()
+
+    def __getstate__(self):
+        """Get state for pickling.
+
+        Note that we need to remove the root and replace it with an indicator that this
+        model is the root. The root will be reset when the object is unpickled.
+        """
+        state = self.__dict__.copy()
+        state.pop("_parents", None)
+        state.pop("root", None)
+        state["self_is_root"] = self is self.root
+        # the next time you access the object, it will be deserializing
+        state["_deserializing"] = True
+        if self.object_is_model():
+            # store the object in a shell when pickling
+            state["_object"] = ModelShell(self._object)
+        return state
+
+    def __setstate__(self, state):
+        """Set state for unpickling
+
+        If self is the root Mutable object, set the root for self
+        (and all Mutable children).
+        """
+        self_is_root = state.pop("self_is_root", False)
+        obj = state.pop("_object")
+        if isinstance(obj, ModelShell):
+            # restore the object from the shell when unpickling
+            obj = obj.unshell()
+        state["_object"] = obj
+        self.__dict__ = state
+
+        if self_is_root:
+            self.set_root(self)
+            # indicate that the root object has finished deserializing
+            self._deserializing = False
+            for child in self.get_tracked_children():
+                if isinstance(child, Mutable):
+                    child._deserializing = False
+
+    def __eq__(self, other):
+        return self._object == other
+
+    def __ne__(self, other):
+        return self._object != other
+
+    def __lt__(self, other):
+        return self._object < other
+
+    def __le__(self, other):
+        return self._object <= other
+
+    def __gt__(self, other):
+        return self._object > other
+
+    def __ge__(self, other):
+        return self._object >= other
+
+    def __pos__(self):
+        return +self._object
+
+    def __neg__(self):
+        return -self._object
+
+    def __abs__(self):
+        return abs(self._object)
+
+    def __invert__(self):
+        return ~self._object
+
+    def __round__(self):
+        return round(self._object)
+
+    def __floor__(self):
+        return math.floor(self._object)
+
+    def __ceil__(self):
+        return math.ceil(self._object)
+
+    def __trunc__(self):
+        return math.trunc(self._object)
+
+    def __add__(self, value):
+        return self._object + value
+
+    def __radd__(self, value):
+        return value + self._object
+
+    def __iadd__(self, value):
+        self._changed()
+        self._object += value
+        return self
+
+    def __sub__(self, value):
+        return self._object - value
+
+    def __rsub__(self, value):
+        return value - self._object
+
+    def __isub__(self, value):
+        self._changed()
+        self._object -= value
+        return self
+
+    def __mul__(self, value):
+        return self._object * value
+
+    def __rmul__(self, value):
+        return value * self._object
+
+    def __imul__(self, value):
+        self._changed()
+        self._object *= value
+        return self
+
+    def __floordiv__(self, value):
+        return self._object // value
+
+    def __rfloordiv__(self, value):
+        return value // self._object
+
+    def __ifloordiv__(self, value):
+        self._changed()
+        self._object //= value
+        return self
+
+    def __truediv__(self, value):
+        return self._object / value
+
+    def __rtruediv__(self, value):
+        return value / self._object
+
+    def __itruediv__(self, value):
+        self._changed()
+        self._object /= value
+        return self
+
+    def __mod__(self, value):
+        return self._object % value
+
+    def __rmod__(self, value):
+        return value % self._object
+
+    def __imod__(self, value):
+        self._changed()
+        if isinstance(value, Mutable):
+            value = value._object
+        self._object %= value
+        return self
+
+    def __pow__(self, value):
+        return self._object ** value
+
+    def __rpow__(self, value):
+        return value ** self._object
+
+    def __ipow__(self, value):
+        self._changed()
+        self._object **= value
+        return self
+
+    def __and__(self, value):
+        return self._object & value
+
+    def __rand__(self, value):
+        return value & self._object
+
+    def __iand__(self, value):
+        self._changed()
+        self._object &= value
+        return self
+
+    def __or__(self, value):
+        return self._object | value
+
+    def __ror__(self, value):
+        return value | self._object
+
+    def __ior__(self, value):
+        self._changed()
+        self._object |= value
+        return self
+
+    def __xor__(self, value):
+        return self._object ^ value
+
+    def __rxor__(self, value):
+        return value ^ self._object
+
+    def __ixor__(self, value):
+        self._changed()
+        self._object ^= value
+        return self
+
+    def __int__(self):
+        return int(self._object)
+
+    def __long__(self):
+        return self._object.__long__()
+
+    def __float__(self):
+        return float(self._object)
+
+    def __complex__(self):
+        return complex(self._object)
+
+    def __bool__(self):
+        return bool(self._object)
+
+    def __index__(self):
+        return self._object.__index__()
+
+    def __format__(self, formatstr):
+        return self._object.__format__(formatstr)
+
+    def __hash__(self):
+        return hash(self._object)
+
+    def __nonzero__(self):
+        return self._object.__nonzero__()
+
+    def __len__(self):
+        return len(self._object)
+
+    def __iter__(self):
+        return iter(self._object)
+
+    def __reversed__(self):
+        return reversed(self._object)
+
+    def __contains__(self, item):
+        return item in self._object
+
+    def __missing__(self, key):
+        return self._object.__missing__(key)
+
+    def __call__(self, *args, **kwargs):
+        return self._object(*args, **kwargs)
+
+    def _changed(self: MutableType) -> MutableType:
+        if self._deserializing:
+            raise RuntimeError(  # pragma: no cover
+                "Mutable object is being unpickled. No changes can be registered at this time."
+            )
+        Mutable.changed(self.root)
+        return self
+
+    def object_is_model(self) -> bool:
+        """Indicates that the wrapped object is a database model.
+
+        Returns:
+            bool: Indicates that the wrapped object is a database model
+        """
+        return hasattr(self._object, "__table__")
+
+    def convert_object(self, obj: Any, root: Mutable) -> Any:
+        """Convert an object before wrapping it in the mutable class.
+
+        Note that this method simply returns the object. Subclasses will likely
+        overwrite this and add their own behavior.
+
+        Args:
+            obj (Any): Object ot convert
+            root (Mutable): Root mutable object.
+
+        Returns:
+            Any: Converted object.
+        """
+        return obj
+
+    def get_object(self) -> Any:
+        """Return the original object wrapped in the mutable class.
+
+        Returns:
+            Any: The original object.
+        """
+        return self._get_object(self._object)
+
+    def _get_object(self, obj: Any = None) -> Any:
+        """Return the original object wrapped in the mutable class.
+
+        Args:
+            obj (Any, optional): Object to get. The object may be wrapped in the mutable
+                class. If None, this method returns the object wrapped by ``self``.
+                Defaults to None.
+
+        Returns:
+            Any: The original object.
+        """
+        return obj.get_object() if isinstance(obj, Mutable) else obj
+
+    def get_tracked_children(self) -> List[Mutable]:
+        """Get the "children" (attributes and items) tracked by the mutable wrapper.
+
+        Returns:
+            List[Mutable]: Tracked children.
+        """
+        return [
+            getattr(self, name) for name in self._tracked_attr_names
+        ] + self.get_tracked_items()
+
+    def get_tracked_items(self) -> List[Mutable]:  # pylint: disable=no-self-use
+        """Get the items tracked by the mutable wrapper.
+
+        Returns:
+            List[Mutable]: Tracked items.
+
+        Note:
+            This method returns an empty list. Subclasses like ``MutableList`` overwrite
+            this.
+        """
+        return []
+
+    def set_root(self: Mutable, root: Mutable = None) -> Mutable:
+        """Set the root mutable object for the current object and all tracked children.
+
+        Args:
+            self (Mutable): [description]
+            root (Mutable, optional): Root mutable object. Defaults to None.
+
+        Returns:
+            Mutable: self.
+        """
+        self.root = self if root is None else root
+        for child in self.get_tracked_children():
+            if isinstance(child, Mutable) and not (
+                hasattr(child, "root") and child.root is self.root
+            ):
+                child.set_root(self.root)
+
+        return self

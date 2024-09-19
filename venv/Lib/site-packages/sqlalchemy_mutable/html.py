@@ -1,0 +1,250 @@
+"""HTML settings.
+"""
+
+from __future__ import annotations
+
+from typing import List, Mapping, Union
+
+from .dict import MutableDict
+from .mutable import Mutable
+from .utils import is_instance
+
+StyleType = Mapping[str, str]  # maps style attribute names to values
+HTMLAttrType = Union[bool, str, List[str], StyleType]
+SelectorType = Mapping[str, StyleType]  # maps css selector to style
+CSSType = Union[str, SelectorType]
+JSType = Union[str, HTMLAttrType]
+HTMLSettingType = Union[SelectorType, HTMLAttrType]
+
+
+class HTMLAttrs(dict):
+    """Mapping of HTML attribute names to values.
+
+    Subclasses ``dict``.
+
+    ``HTMLAttrs`` maps HTML attribute names to values. The ``"class"`` attribute is a
+    list of classes e.g., ``["myclass0", "myclass1"]``. The ``"style"`` attribute is a
+    mapping of attribute names to values e.g.,
+    ``{"background-color": "grey", "width": "80px"}``. All other attribute names map to
+    a string or bool.
+    """
+
+    def update_attrs(self, attrs: Mapping[str, HTMLAttrType]):
+        """Update HTML tag attributes.
+
+        This method will append new classes to ``"class"`` and update the ``"style"``
+        dictionary, rather than overwrite them.
+
+        Args:
+            attrs (Mapping[str, HTMLAttrType]): Mapping of attribute names to udpated values.
+        """
+        for name, value in dict(attrs).items():
+            if name == "class":
+                if name not in self:
+                    self[name] = []
+                self[name] += value
+            elif name == "style":
+                if name not in self:
+                    self[name] = {}
+                self[name].update(value)
+            else:
+                self[name] = value
+
+    def get_attrs(self) -> str:
+        """Get the tag attributes as an HTML string.
+
+        Use this method to insert HTML attributes in a template.
+
+        Returns:
+            str: Tag attributes as HTML.
+        """
+        html = []
+        for name, value in self.items():
+            # note that `0 in (False,)` evaluates to True
+            if value in (None, "") or value is False:
+                continue
+
+            if value is True:
+                html.append(name)
+            else:
+                if name == "class":
+                    # class attribute is a list
+                    value = " ".join(value)
+                elif name == "style":
+                    # style attribute is a dict
+                    value = (
+                        ";".join([f"{key}:{item}" for key, item in value.items()]) + ";"
+                    )
+                html.append(f'{name}="{value}"')
+
+        return " ".join(html)
+
+
+@Mutable.register_class(HTMLAttrs)
+class _MutableHTMLAttrs(MutableDict):
+    def convert_object(self, obj: Mapping, root: Mutable) -> HTMLAttrs:
+        """Convert object into a mutable HTML attributes dictionary.
+
+        Args:
+            obj (Mapping): Object to convert.
+            root (Mutable): Root mutable object.
+
+        Returns:
+            HTMLAttrs: Converted object.
+        """
+        return HTMLAttrs(super().convert_object(obj, root))
+
+    def update_attrs(
+        self, *args, **kwargs
+    ):  # pylint: disable=missing-function-docstring
+        self._changed()
+        self._object.update_attrs(*args, **kwargs)
+
+
+class HTMLSettings(dict):
+    """HTML settings dictionary.
+
+    Args:
+        settings (Mapping[str, HTMLSettingType]): Maps HTML setting key (usually "css",
+            "js" or a tag name like "input") to a value.
+
+    Notes:
+        The ``"css"`` key maps to a list of CSS items. CSS items may be an href (as a
+        string), a link tag (as a string), or a dictionary mapping CSS selectors to
+        values. The ``"js"`` key maps to a list of javascript items. Javascript items
+        may be raw javascript code (as a string) or a dictionary mapping attributes to
+        values in a script tag. All other keys map to :class:`HTMLAttrs`.
+    """
+
+    def __init__(self, settings: Mapping[str, HTMLSettingType]):
+        settings = dict(settings)
+
+        css = settings.get("css", [])
+        if not is_instance(css, list):
+            css = [css]
+        settings["css"] = css
+
+        javascript = settings.get("js", [])
+        if not is_instance(javascript, list):
+            javascript = [javascript]
+        settings["js"] = javascript
+
+        for tag_name, html_attributes in settings.items():
+            if tag_name not in ("css", "js"):
+                settings[tag_name] = HTMLAttrs(html_attributes)
+
+        super().__init__(settings)
+
+    def __setitem__(self, key: str, value: HTMLSettingType):
+        if key not in ("css", "js") and not is_instance(value, HTMLAttrs):
+            value = HTMLAttrs(value)
+        super().__setitem__(key, value)
+
+    def update_settings(self, settings: Mapping[str, HTMLSettingType]):
+        """Update HTML settings.
+
+        Args:
+            settings (Mapping[str, HTMLSettingType]): Maps settings key to an updated
+                value. If the key is "css" or "js", this method appends additional CSS
+                or javascript items. Otherwise, it calls
+                :meth:`HTMLAttrs.update_attrs`.
+        """
+        for name, value in dict(settings).items():
+            if name in ("css", "js"):
+                if is_instance(value, list):
+                    self[name] += value
+                else:
+                    self[name].append(value)
+            elif name not in self:
+                self[name] = HTMLAttrs(value)
+            else:
+                self[name].update_attrs(value)
+
+    def get_css(self) -> str:
+        """Get the CSS for insertion into template.
+
+        Returns:
+            str: CSS.
+        """
+
+        def format_item(item: CSSType) -> str:
+            if is_instance(item, str):
+                item = item.strip()
+
+                if item.startswith("<"):
+                    # interpret the item as a link tag
+                    return item
+
+                # interpret the item as the href attribute of a link tag
+                return f'<link rel="stylesheet" href="{item}">'
+
+            # interpret the item as a mapping of css selectors to style
+            # style is a mapping of attributes to values
+            if not is_instance(item, Mapping):
+                raise ValueError(
+                    f"CSS items must be a string or mapping, got {item} of type {type(item)}."
+                )
+
+            selectors = []
+            for selector, style in dict(item).items():
+                formatted_style = (
+                    ";".join(f"{attr}:{value}" for attr, value in dict(style).items())
+                    + ";"
+                )
+                selectors.append(selector + "{" + formatted_style + "}")
+
+            return f"<style>{''.join(selectors)}</style>"
+
+        css = self["css"]
+        if not css:
+            return ""
+        return "".join(format_item(item) for item in css)
+
+    def get_js(self) -> str:
+        """Get the javascript for insertion into a template.
+
+        Returns:
+            str: javascript.
+        """
+
+        def format_item(item: JSType) -> str:
+            if isinstance(item, str):
+                item = item.strip()
+
+                # interpret the item as a script tag
+                if item.startswith("<"):
+                    return item
+
+                # interpret the item as raw javascript code
+                return f"<script>{item}</script>"
+
+            # interpret the item as mapping attribute names to values in a script tag
+            attrs = " ".join(f'{key}="{value}"' for key, value in dict(item).items())
+            return f"<script {attrs}></script>"
+
+        javascript = self["js"]
+        if not javascript:
+            return ""
+        return "".join(format_item(item) for item in javascript)
+
+
+@Mutable.register_class(HTMLSettings)
+class _MutableHTMLSettings(MutableDict):
+    def convert_object(self, obj: Mapping, root: Mutable) -> HTMLSettings:
+        if obj is None:
+            obj = {}
+        obj = HTMLSettings(obj)
+        for key, item in obj.items():
+            obj[key] = self._convert_item(item, root)
+        return obj
+
+    def __setitem__(self, key: str, value: HTMLSettingType):
+        if key not in ("css", "js") and not is_instance(value, _MutableHTMLAttrs):
+            value = _MutableHTMLAttrs(value)
+        super().__setitem__(key, value)
+
+    def update_settings(
+        self, *args, **kwargs
+    ):  # pylint: disable=missing-function-docstring
+        self._changed()
+        self._object.update_settings(*args, **kwargs)

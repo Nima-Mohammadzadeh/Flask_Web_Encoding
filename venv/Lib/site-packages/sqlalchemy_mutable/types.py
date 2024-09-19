@@ -1,0 +1,108 @@
+"""Database column types.
+"""
+from __future__ import annotations
+
+import json
+
+from sqlalchemy import types
+
+from .mutable import Mutable
+from .dict import MutableDict
+from .html import _MutableHTMLSettings
+from .list import MutableList
+from .set import MutableSet
+from .tuple import MutableTuple
+
+
+class MutablePickleType(types.TypeDecorator):  # pylint: disable=abstract-method
+    """Generic mutable type with pickle serialization.
+
+    This is the most flexible and powerful database column type. Use this if you're
+    unsure what data you might put in this column.
+    """
+
+    impl = types.PickleType
+
+
+Mutable.associate_with(MutablePickleType)
+
+
+class MutableDictPickleType(MutablePickleType):  # pylint: disable=abstract-method
+    """Mutable dictionary type with pickle serialization."""
+
+
+MutableDict.associate_with(MutableDictPickleType)
+
+
+class MutableListPickleType(MutablePickleType):  # pylint: disable=abstract-method
+    """Mutable list type with pickle serialization."""
+
+
+MutableList.associate_with(MutableListPickleType)
+
+
+class MutableSetPickleType(MutablePickleType):  # pylint: disable=abstract-method
+    """Mutable set type with pickle serialization."""
+
+
+MutableSet.associate_with(MutableSetPickleType)
+
+
+class MutableTuplePickleType(MutablePickleType):  # pylint: disable=abstract-method
+    """Mutable tuple type with pickle serialization."""
+
+
+MutableTuple.associate_with(MutableTuplePickleType)
+
+
+class MutableJSONType(types.TypeDecorator):  # pylint: disable=abstract-method
+    """Generic mutable type with JSON serialization.
+
+    Use this if you know that your data will be JSON serializable but are otherwise
+    unsure what data you might put in this column.
+    """
+
+    impl = types.JSON
+
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        return json.dumps(value.get_object())
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        return Mutable(json.loads(value))
+
+
+Mutable.associate_with(MutableJSONType)
+
+
+class MutableDictJSONType(MutableJSONType):  # pylint: disable=abstract-method
+    """Mutable dictionary type with JSON serialization."""
+
+
+MutableDict.associate_with(MutableDictJSONType)
+
+
+class MutableListJSONType(MutableJSONType):  # pylint: disable=abstract-method
+    """Mutable list type with JSON serialization."""
+
+
+MutableList.associate_with(MutableListJSONType)
+
+
+class MutableTupleJSONType(MutableJSONType):  # pylint: disable=abstract-method
+    """Mutable tuple type with JSON serialization."""
+
+
+MutableTuple.associate_with(MutableTupleJSONType)
+
+
+class HTMLSettingsType(MutableJSONType):  # pylint: disable=abstract-method
+    """HTML settings dictionary type"""
+
+
+_MutableHTMLSettings.associate_with(HTMLSettingsType)

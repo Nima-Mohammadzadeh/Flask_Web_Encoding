@@ -1,0 +1,74 @@
+"""Mutable dictionary.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Mapping
+
+from .mutable import Mutable
+
+
+@Mutable.register_class(dict)
+class MutableDict(Mutable):
+    """Mutable wrapper for dictionaries.
+
+    Sublasses :class:`sqlalchemy_mutable.mutable.Mutable`.
+    """
+
+    def convert_object(self, obj: Mapping, root: Mutable) -> Dict[Any, Any]:
+        """Convert an object into a mutable dictionary.
+
+        Args:
+            obj (Mapping): Object to convert.
+            root (Mutable): Root mutable object.
+
+        Returns:
+            Dict[Any, Mutable]: Converted object.
+        """
+        if isinstance(obj, Mutable) and not isinstance(
+            obj._object, dict  # pylint: disable=protected-access
+        ):
+            obj = obj.get_object()
+        return (
+            {}
+            if obj is None
+            else {
+                key: self._convert_item(item, root) for key, item in dict(obj).items()
+            }
+        )
+
+    def get_object(self) -> Dict[Any, Any]:
+        """Get a shallow copy of the dictionary wrapped in the mutable object.
+
+        Returns:
+            Dict[Any, Any]: Shallow copy of the dictionary.
+        """
+        return {key: self._get_object(item) for key, item in self._object.items()}
+
+    def get_tracked_items(self) -> List[Mutable]:
+        """Get the dictionary items whose mutations are being tracked.
+
+        Returns:
+            List[Mutable]: Tracked items.
+        """
+        return [item for item in self._object.values() if isinstance(item, Mutable)]
+
+    def clear(self):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.clear()
+
+    def pop(self, key):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.pop(key)
+
+    def popitem(self):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.popitem()
+
+    def setdefault(self, key, value):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.setdefault(key, value)
+
+    def update(self, iterable):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.update(iterable)

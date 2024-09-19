@@ -1,0 +1,48 @@
+"""Mutable tuple.
+"""
+
+from __future__ import annotations
+
+from typing import Iterable, List, Tuple
+
+from .mutable import Mutable
+
+
+@Mutable.register_class(tuple)
+class MutableTuple(Mutable):
+    """Mutable wrapper for tuples.
+
+    Subclasses :class:`sqlalchemy_mutable.Mutable`.
+    """
+
+    def convert_object(self, obj: Iterable, root: Mutable) -> Tuple:
+        """Convert an object into a mutable tuple.
+
+        Args:
+            obj (Iterable): Object to convert.
+            root (Mutable): Root mutable object.
+
+        Returns:
+            Tuple: Converted tuple.
+        """
+        return (
+            tuple()
+            if obj is None
+            else tuple((self._convert_item(item, root) for item in tuple(obj)))
+        )
+
+    def get_object(self) -> Tuple:
+        """Get a shallow copy of the tuple wrapped in the mutable object.
+
+        Returns:
+            Tuple: Shallow copy of the tuple.
+        """
+        return tuple((self._get_object(item) for item in self._object))
+
+    def get_tracked_items(self) -> List[Mutable]:
+        """Get the list of items whose mutations are being tracked.
+
+        Returns:
+            List[Mutable]: Tracked items.
+        """
+        return list([item for item in self._object if isinstance(item, Mutable)])

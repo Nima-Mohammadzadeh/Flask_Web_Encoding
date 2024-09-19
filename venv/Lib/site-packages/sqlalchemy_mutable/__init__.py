@@ -1,0 +1,13 @@
+"""SQLAlchemy Mutable
+By Dillon Bowen dsbowen@wharton.upenn.edu
+SQLAlchemy Mutable provided utilities for creating flexible and powerful database
+columns for use with SQLAlchemy."""
+
+__version__ = "1.0.2"
+
+from .mutable import Mutable
+from .model_shell import Query
+from .dict import MutableDict
+from .list import MutableList
+from .set import MutableSet
+from .tuple import MutableTuple

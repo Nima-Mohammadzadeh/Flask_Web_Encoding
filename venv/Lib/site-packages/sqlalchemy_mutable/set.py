@@ -1,0 +1,66 @@
+"""Mutable set.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Iterable, Set
+
+from .mutable import Mutable
+
+
+@Mutable.register_class(set)
+class MutableSet(Mutable):
+    """Mutable wrapper for lists.
+
+    Subclasses :class:`Mutable`.
+    """
+
+    def convert_object(self, obj: Iterable, root: Mutable) -> Set[Any]:
+        """Convert an object into a mutable set.
+
+        Args:
+            obj (Iterable): Object to convert.
+            root (Mutable): Root mutable object.
+
+        Returns:
+            Set[Any]: Converted set.
+        """
+        return set() if obj is None else set(obj)
+
+    def add(self, item):  # pylint: disable=missing-docstring
+        if isinstance(item, Mutable):
+            item = item._object  # pylint: disable=protected-access
+        self._changed()
+        return self._object.add(item)
+
+    def clear(self):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.clear()
+
+    def difference_update(self, other):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.difference_update(other)
+
+    def discard(self, item):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.discard(item)
+
+    def intersection_update(self, *others):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.intersection_update(*others)
+
+    def pop(self):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.pop()
+
+    def remove(self, item):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.remove(item)
+
+    def symmetric_difference_update(self, other):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.symmetric_difference_update(other)
+
+    def update(self, other):  # pylint: disable=missing-docstring
+        self._changed()
+        return self._object.update(other)

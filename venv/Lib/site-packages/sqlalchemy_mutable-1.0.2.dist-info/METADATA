@@ -1,0 +1,47 @@
+Metadata-Version: 2.1
+Name: sqlalchemy-mutable
+Version: 1.0.2
+Summary: SQLAlchemy Mutable provided utilities for creating flexible and powerful database columns for use with SQLAlchemy.
+Home-page: https://dsbowen.gitlab.io/sqlalchemy-mutable
+Author: Dillon Bowen
+Author-email: dsbowen@wharton.upenn.edu
+License: UNKNOWN
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: sqlalchemy (>=1.3.12)
+
+# SQLAlchemy Mutable
+
+[![pipeline status](https://gitlab.com/dsbowen/sqlalchemy-mutable/badges/master/pipeline.svg)](https://gitlab.com/dsbowen/sqlalchemy-mutable/-/commits/master)
+[![coverage report](https://gitlab.com/dsbowen/sqlalchemy-mutable/badges/master/coverage.svg)](https://gitlab.com/dsbowen/sqlalchemy-mutable/-/commits/master)
+[![PyPI version](https://badge.fury.io/py/sqlalchemy-mutable.svg)](https://badge.fury.io/py/sqlalchemy-mutable)
+[![License](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://gitlab.com/dsbowen/sqlalchemy-mutable/-/blob/master/LICENSE)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gl/dsbowen%2Fsqlalchemy-mutable/HEAD?urlpath=lab/tree/examples)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+SQLAlchemy Mutable provided utilities for creating flexible and powerful database columns for use with SQLAlchemy. [Read the docs](https://dsbowen.gitlab.io/sqlalchemy-mutable).
+
+To test with SQLAlchemy:
+
+```
+$ make test
+```
+
+or 
+
+```
+$ tox
+```
+
+To test with Flask-SQLAlchemy:
+
+```
+$ tox -e flask
+```
+
+

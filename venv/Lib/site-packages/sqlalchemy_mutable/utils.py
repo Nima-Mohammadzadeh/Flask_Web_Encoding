@@ -1,0 +1,137 @@
+"""Utilities.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable, Dict, Tuple, Type, Union
+
+from .mutable import Mutable
+
+
+def get_object(obj: Any) -> Any:
+    """Get the underlying object from a mutable wrapper.
+
+    Can be used to get the object when it is unclear whether the object has been
+    wrapped in a mutable wrapper.
+
+    Args:
+        obj (Any): (Possibly) mutable object.
+
+    Returns:
+        Any: Underlying object.
+    """
+    return obj.get_object() if isinstance(obj, Mutable) else obj
+
+
+def is_callable(obj: Any) -> bool:
+    """Checks if an object is callable.
+
+    Args:
+        obj (Any): Object to check.
+
+    Returns:
+        bool: Indicates the object is callable.
+    """
+    return callable(obj.get_object()) if isinstance(obj, Mutable) else callable(obj)
+
+
+def is_instance(obj: Any, classes: Union[Type, Tuple]) -> bool:
+    """Checks if the object is an instance of the given class.
+
+    Args:
+        obj (Any): Object to check.
+        classes (Union[Type, Tuple]): Class or classes against which to check the
+            object.
+
+    Returns:
+        bool: Indicates that the object was an instance of the class.
+    """
+    return isinstance(obj, classes) or (
+        isinstance(obj, Mutable)
+        and isinstance(obj._object, classes)  # pylint: disable=protected-access
+    )
+
+
+def is_subclass(cls: Type, classes: Union[Type, Tuple]) -> bool:
+    """Checks if a target class is a subclass of the given classes.
+
+    Args:
+        cls (Type): Target class to check.
+        classes (Union[Type, Tuple]): Class or classes against which to check the
+            target subclass.
+
+    Returns:
+        bool: Indicates the target class is a subclass of the given classes.
+    """
+    return issubclass(cls, classes) or (
+        isinstance(cls, Mutable)
+        and issubclass(cls._object, classes)  # pylint: disable=protected-access
+    )
+
+
+class partial:  # pylint: disable=too-few-public-methods, invalid-name
+    """Wrapper for callables stored in a mutable database column.
+
+    This class's behavior mimics `functools.partial`.
+
+    Args:
+        func (Callable): Function to wrap.
+        *args (Any): Arguments passed to the function when called.
+        **kwargs (Any): Keyword arguments passed to the function when called.
+
+    Attributes:
+        func (Callable): Function to wrap.
+        args (Tuple): Arguments passed to the function when called.
+        kwargs (Dict): Keyword arguments passed to the function when called.
+    """
+
+    def __init__(self, func: Callable, *args: Any, **kwargs: Any) -> None:
+        self.__name__ = func.__name__
+        self.func = func
+        # args will be converted into a MutableTuple
+        self.args = args
+        # kwargs will be converted into a MutableDict
+        self.kwargs = kwargs
+
+    def __call__(self, *args, **kwargs):
+        self_args, combined_kwargs = self._get_args()
+        combined_kwargs.update(kwargs)
+        return self.func(*args, *self_args, **combined_kwargs)
+
+    def __repr__(self):
+        return self._make_repr(self.args, self.kwargs)
+
+    def __str__(self):
+        return self._make_repr(*self._get_args())
+
+    def _get_args(self) -> Tuple[Tuple, Dict[str, Any]]:
+        """Get non-mutable versions of the arguments and keyword arguments.
+
+        Returns:
+            Tuple[Tuple, Dict[str, Any]]: (args, kwargs).
+        """
+        if isinstance(self.kwargs, Mutable):
+            kwargs = self.kwargs.get_object()  # pylint: disable=no-member
+        else:
+            kwargs = self.kwargs.copy()
+
+        if isinstance(self.args, Mutable):
+            args = self.args.get_object()  # pylint: disable=no-member
+        else:
+            args = self.args
+
+        return args, kwargs
+
+    def _make_repr(self, args: Tuple, kwargs: Dict[str, Any]) -> str:
+        """Make a representation of the partial function with the given args and kwargs.
+
+        Args:
+            args (Tuple): Arguments passed to the function.
+            kwargs (Dict[str, Any]): Keyword arguments passed to the function.
+
+        Returns:
+            str: [description]
+        """
+        args = [repr(arg) for arg in args]
+        kwargs = [f"{key}={repr(value)}" for key, value in kwargs.items()]
+        return f"<{self.__name__}({', '.join(args + kwargs)})>"
