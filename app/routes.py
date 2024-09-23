@@ -24,17 +24,7 @@ def job_setup():
     form = DatabaseForm()
     
     current_serial = db.session.scalar(select(serialNumber.CurrentSerial))
-    form.serial.data = current_serial
-  
-
-    if form.validate_on_submit():
-        if form.submit.data:
-            new_serial = update_serial_number(form)
-            if new_serial:
-                send_serial_update(new_serial)
-                return redirect(url_for('download'), code=307)
-            else:
-                flash('Error updating serial number at line 36')    
+    form.serial.data = current_serial 
 
     return render_template('job-setup.html', title='Job Setup', form=form )
 
@@ -70,17 +60,22 @@ def update_serial_number(form):
 def download():
     form = DatabaseForm(request.form)
     if form.validate():
-        excel_file = form.generate_excel_file()
-        return send_file(
-            excel_file, 
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True, 
-            download_name= f'{form.UPC.data}-{form.serial.data}-{form.serial.data + form.quantity.data - 1}.xlsx'
-        )
+        new_serial = update_serial_number(form)
+        if new_serial:
+            send_serial_update(new_serial)
+            excel_file = form.generate_excel_file()
+            return send_file(
+                excel_file, 
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                as_attachment=True, 
+                download_name= f'{form.UPC.data}-{form.serial.data}-{form.serial.data + form.quantity.data - 1}.xlsx'
+            )
+        else:
+            flash('Error in form')
+            return redirect(url_for('job_setup'))
     else:
         flash('Error in form')
         return redirect(url_for('job_setup'))
-    
 
 
 @app.route('/roll_tracker')

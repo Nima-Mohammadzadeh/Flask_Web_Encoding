@@ -60,8 +60,49 @@
 
         // Form submission is handled by the server, but we can log it
         document.getElementById('job-setup-form').addEventListener('submit', function(e) {
+            e.preventDefault();
             console.log('Form submitted');
+            
+
+            var formData = new FormData(this);
+
+            fetch("{{ url_for('download') }}", {
+                method: 'POST',
+                body: formData,
+        })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob().then(blob => ({ blob: blob, response: response }));;
+                } else {
+                    throw new Error('Network response was not ok.');
+            }
+        })
+            .then(({ blob, response })  => {
+                // Create a link to download the file
+                var url = window.URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                // Get the filename from the response headers
+                var disposition = response.headers.get('Content-Disposition');
+                var filename = 'download.xlsx'; // Default filename
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                    var filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                    var matches = filenameRegex.exec(disposition);
+                    if (matches != null && matches[1]) { 
+                        filename = matches[1].replace(/['"]/g, '');
+                    }
+                }
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => {
+                console.error('Error:', error);
         });
+    });
+
 
         function openRollTracker() {
             window.open("{{ url_for('roll_tracker') }}", "_self");
