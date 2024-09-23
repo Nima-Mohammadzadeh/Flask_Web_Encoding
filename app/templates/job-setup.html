@@ -2,7 +2,7 @@
 
 {% block content %}
     <h1>Job setup</h1>
-    <form action="" method="post" novalidate>
+    <form action="" method="post" novalidate id="job-setup-form">
         {{ form.hidden_tag() }}
         <p>
             {{ form.serial.label }}<br>
@@ -33,7 +33,36 @@
         <p>{{ form.submit() }} <button type ="button" onclick="openRollTracker()">Go to Roll Tracker</button></p>
     </form>
 
-    <script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script type="text/javascript" charset="utf-8">
+        var socket = io({
+
+            transports: ['websocket']
+                });
+
+
+        socket.on('connect', function() {
+            console.log('Connected to server');
+            requestCurrentSerial();
+        });
+
+        socket.on('update_serial', function(data) {
+            document.getElementById('serial').value = data.new_serial;
+            console.log('Serial number updated:', data.new_serial);
+        });
+
+        function requestCurrentSerial() {
+            socket.emit('request_current_serial');
+        }
+
+        // Request current serial every 30 seconds to ensure consistency
+        setInterval(requestCurrentSerial, 10000);
+
+        // Form submission is handled by the server, but we can log it
+        document.getElementById('job-setup-form').addEventListener('submit', function(e) {
+            console.log('Form submitted');
+        });
+
         function openRollTracker() {
             window.open("{{ url_for('roll_tracker') }}", "_self");
         }

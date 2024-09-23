@@ -1,3 +1,5 @@
+from flask_socketio import emit
+from app import socketio
 from flask import render_template, flash, redirect, request, url_for
 from app import app
 from app.forms import DatabaseForm 
@@ -27,22 +29,42 @@ def job_setup():
 
     if form.validate_on_submit():
         if form.submit.data:
-
-            qty = form.quantity.data           
-            adjusted_qty = helpers.calculate_adjusted_quantity(qty, form.two_percent.data, form.seven_percent.data)
-            
-
-            new_serial = current_serial + adjusted_qty
-            serialNumber.query.update({serialNumber.CurrentSerial: new_serial})
-            db.session.commit()
-
-            return redirect(url_for('download'), code=307)
-        
-        
+            new_serial = update_serial_number(form)
+            if new_serial:
+                send_serial_update(new_serial)
+                return redirect(url_for('download'), code=307)
+            else:
+                flash('Error updating serial number at line 36')    
 
     return render_template('job-setup.html', title='Job Setup', form=form )
 
+def send_serial_update(new_serial):
+    socketio.emit('update_serial', {'new_serial': new_serial})
 
+@socketio.on('connect')
+def handle_connect():
+    current_serial = db.session.scalar(select(serialNumber.CurrentSerial))
+    socketio.emit('update_serial', {'new_serial': current_serial})
+
+@socketio.on('request_current_serial')
+def handle_request_current_serial():
+    current_serial = db.session.scalar(select(serialNumber.CurrentSerial))
+    socketio.emit('update_serial', {'new_serial': current_serial})
+def update_serial_number(form):
+    try:
+        qty = form.quantity.data
+        adjusted_qty = helpers.calculate_adjusted_quantity(qty, form.two_percent.data, form.seven_percent.data)
+        current_serial = db.session.scalar(select(serialNumber.CurrentSerial))
+        new_serial = current_serial + adjusted_qty
+        
+        db.session.execute(update(serialNumber).values(CurrentSerial=new_serial))
+        db.session.commit()
+        return new_serial
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating serial number: {str(e)}")
+        return None
+    
 
 @app.route('/download', methods=['POST'])
 def download():
