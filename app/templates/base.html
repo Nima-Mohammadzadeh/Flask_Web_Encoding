@@ -10,11 +10,15 @@
         {% endif %}
     </head>
     <body>
-        <div>
-        Encoding: 
-        <a href="{{ url_for('Home') }}">Home</a>
-        <a href="{{ url_for('job_setup') }}">Job setup</a>
-        </div>
+        <nav class="navbar">
+            <div class="container mx-auto flex justify-between items-center">
+                <a href="{{ url_for('Home') }}" class="text-white text-xl font-bold">My Flask App</a>
+                <div class="flex space-x-4">
+                    <a href="{{ url_for('Home') }}" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Home</a>
+                    <a href="{{ url_for('job_setup') }}" class="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Job Setup</a>
+                </div>
+            </div>
+        </nav>
         
         <hr>
         {% with messages = get_flashed_messages() %}

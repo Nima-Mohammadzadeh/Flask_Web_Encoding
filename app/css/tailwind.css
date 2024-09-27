@@ -1,3 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+.custom-submit-button {
+    @apply bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded; /* Applying Tailwind classes */
+}
+
+.navbar {
+    @apply bg-blue-500 p-4; /* Background color and padding */
+}
+
+.navbar-container {
+    @apply container mx-auto flex justify-between items-center; /* Center content and set flex layout */
+}
+
+.navbar-link {
+    @apply text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium; /* Link styling */
+}
+
+.navbar-brand {
+    @apply text-gray-300 text-xl font-bold; /* Brand or title styling */
+}

@@ -1,37 +1,44 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <h1>Job setup</h1>
+<div class="max-w-md mx-auto bg-white shadow-md rounded-lg p-6 mt-6">
+    <h1 class="text-2xl font-semibold mb-4">Job Setup</h1>
     <form action="" method="post" novalidate id="job-setup-form">
         {{ form.hidden_tag() }}
-        <p>
-            {{ form.serial.label }}<br>
-            {{ form.serial(size=32) }}
-            {% for error in form.serial.errors %}<br>
-            <span style ="color: red;">[{{ error }}]</span>
+        <div class="mb-4">
+            <label class="block text-lg font-medium">{{ form.serial.label }}</label>
+            {{ form.serial(size=32, class="border border-gray-300 p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500") }}
+            {% for error in form.serial.errors %}
+            <span class="text-red-500 text-sm">{{ error }}</span>
             {% endfor %}
-        </p>
-        <p>
-            {{ form.UPC.label  }}<br>
-            {{ form.UPC(size=32) }}
-            {% for error in form.UPC.errors %}<br>
-            <span style ="color: red;">[{{ error }}]</span>
+        </div>
+        <div class="mb-4">
+            <label class="block text-lg font-medium">{{ form.UPC.label }}</label>
+            {{ form.UPC(size=32, class="border border-gray-300 p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500") }}
+            {% for error in form.UPC.errors %}
+            <span class="text-red-500 text-sm">{{ error }}</span>
             {% endfor %}
-        </p>
-        
-        <p> 
-            {{ form.quantity.label }}<br>
-            {{ form.quantity(size=32) }}
-            {% for error in form.quantity.errors %}<br>
-            <span style ="color: red;">[{{ error }}]</span>
+        </div>
+        <div class="mb-4">
+            <label class="block text-lg font-medium">{{ form.quantity.label }}</label>
+            {{ form.quantity(size=32, class="border border-gray-300 p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500") }}
+            {% for error in form.quantity.errors %}
+            <span class="text-red-500 text-sm">{{ error }}</span>
             {% endfor %}
-        </p>
-
-        <p>{{ form.two_percent.label }}{{ form.two_percent() }} </p>
-        <p>{{ form.seven_percent.label }}{{ form.seven_percent() }}</p>
-        
-        <p>{{ form.submit(class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded") }} <button type ="button" onclick="openRollTracker()">Go to Roll Tracker</button></p>
+        </div>
+        <div class="flex items-center mb-4">
+            <label class="mr-2">{{ form.two_percent.label }}</label>
+            {{ form.two_percent() }}
+            <label class="mr-2 ml-4">{{ form.seven_percent.label }}</label>
+            {{ form.seven_percent() }}
+        </div>
+        <div class="flex justify-between">
+            {{ form.submit(class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded") }}
+            <button type="button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onclick="openRollTracker()">Go to Roll Tracker</button>
+        </div>
     </form>
+</div>
+
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script type="text/javascript" charset="utf-8">
