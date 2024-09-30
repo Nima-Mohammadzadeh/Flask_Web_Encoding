@@ -3,8 +3,17 @@
 {% block content %}
     <div class="max-w-md mx-auto bg-white shadow-md rounded-lg p-6 mt-6">
     <h1 class="text-2xl font-semibold mb-4">Job Setup</h1>
-    <form action="" method="post" id="job-setup-form">
+    <form action="" method="post" id="job-setup-form" >
         {{ form.hidden_tag() }}
+
+        <div class="mbq-4">
+            <label for="label" class="block text-lg font-medium">Select Label Type:</label>
+            {{ form.label(class="border border-gray-300 p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500") }}
+            {% for error in form.label.errors %}
+            <span class="text-red-500 text-sm">{{ error }}</span>
+            {% endfor %}
+
+        </div>
         <div class="mb-4">
             <label class="block text-lg font-medium">{{ form.serial.label }}</label>
             {{ form.serial(size=32, class="border border-gray-300 p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500") }}

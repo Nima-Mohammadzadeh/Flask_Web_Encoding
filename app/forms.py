@@ -1,12 +1,18 @@
 from io import BytesIO
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, BooleanField, SubmitField
+from wtforms import StringField, IntegerField, BooleanField, SubmitField, SelectField
 from wtforms.validators import ValidationError, DataRequired, Length
 import pandas as pd
 import openpyxl
 from utils import helpers
 
 class DatabaseForm(FlaskForm):
+    label = SelectField('Label', choices=[
+        ('UPC', 'UPC'),
+        ('SKU', 'SKU'),
+        ('Part Number', 'Part Number')
+    ])
+    
     serial = IntegerField('Serial Number', render_kw={'readonly': True})
 
     UPC = StringField('UPC', validators=[

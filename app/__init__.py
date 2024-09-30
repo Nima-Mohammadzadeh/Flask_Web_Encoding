@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 
 app = Flask(__name__, static_folder='static')
+BARTENDER_TEMPLATES_DIR = 'templates/bartender_files'
 app.config.from_object(Config)
 db = SQLAlchemy(app)
 socketio = SocketIO(app , cors_allowed_origins="*")

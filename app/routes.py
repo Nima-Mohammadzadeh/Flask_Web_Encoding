@@ -15,18 +15,22 @@ from utils import helpers
 @app.route('/')
 @app.route('/index')
 def Home():
+
+
     return render_template('index.html', title='Home')
 
 
 @app.route('/job-setup', methods=['GET', 'POST'])
 def job_setup():
 
+    customers = ['All Barcodes Systems']
+
     form = DatabaseForm(request.form)
     
     current_serial = db.session.scalar(select(serialNumber.CurrentSerial))
     form.serial.data = current_serial 
 
-    return render_template('job-setup.html', title='Job Setup', form=form )
+    return render_template('job-setup.html', title='Job Setup', form=form, customers=customers)
 
 def send_serial_update(new_serial):
     socketio.emit('update_serial', {'new_serial': new_serial})
