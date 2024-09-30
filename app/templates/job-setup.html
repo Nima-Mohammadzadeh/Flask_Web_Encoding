@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="max-w-md mx-auto bg-white shadow-md rounded-lg p-6 mt-6">
+    <div class="max-w-md mx-auto bg-white shadow-md rounded-lg p-6 mt-6">
     <h1 class="text-2xl font-semibold mb-4">Job Setup</h1>
-    <form action="" method="post" novalidate id="job-setup-form">
+    <form action="" method="post" id="job-setup-form">
         {{ form.hidden_tag() }}
         <div class="mb-4">
             <label class="block text-lg font-medium">{{ form.serial.label }}</label>
@@ -81,8 +81,16 @@
                 if (response.ok) {
                     return response.blob().then(blob => ({ blob: blob, response: response }));;
                 } else {
-                    throw new Error('Network response was not ok.');
-            }
+                    return response.json().then(data => {
+                if (data.errors) {
+                    // Display errors to the user
+                    displayErrors(data.errors);
+                } else {
+                    alert('An unknown error occurred.');
+                }
+                throw new Error('Form submission failed');
+            });
+          }
         })
             .then(({ blob, response })  => {
                 // Create a link to download the file
@@ -110,6 +118,26 @@
         });
     });
 
+        function displayErrors(errors) {
+            // Clear any existing errors
+            document.querySelectorAll('.error-message').forEach(el => el.remove());
+
+            errors.forEach(error => {
+                const errorElement = document.createElement('span');
+                errorElement.classList.add('text-red-500', 'text-sm', 'error-message');
+                errorElement.textContent = error;
+
+                // Append the error message to the appropriate form field
+                if (error.startsWith('UPC:')) {
+                    document.querySelector('[name="UPC"]').parentElement.appendChild(errorElement);
+                } else if (error.startsWith('Quantity:')) {
+                    document.querySelector('[name="quantity"]').parentElement.appendChild(errorElement);
+                } else {
+                    // General errors can be appended elsewhere
+                    document.getElementById('job-setup-form').prepend(errorElement);
+                }
+            });
+        }
 
         function openRollTracker() {
             window.open("{{ url_for('roll_tracker') }}", "_self");

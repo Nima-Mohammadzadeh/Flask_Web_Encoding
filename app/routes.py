@@ -21,7 +21,7 @@ def Home():
 @app.route('/job-setup', methods=['GET', 'POST'])
 def job_setup():
 
-    form = DatabaseForm()
+    form = DatabaseForm(request.form)
     
     current_serial = db.session.scalar(select(serialNumber.CurrentSerial))
     form.serial.data = current_serial 
@@ -71,11 +71,14 @@ def download():
                 download_name= f'{form.UPC.data}-{form.serial.data}-{form.serial.data + form.quantity.data - 1}.xlsx'
             )
         else:
-            flash('Error in form')
-            return redirect(url_for('job_setup'))
+            return jsonify({'success': False, 'errors': ['Error updating serial number']}), 500
     else:
-        flash('Error in form')
-        return redirect(url_for('job_setup'))
+        # Collect all validation errors
+        errors = []
+        for field, field_errors in form.errors.items():
+            for error in field_errors:
+                errors.append(f"{getattr(form, field).label.text}: {error}")
+        return jsonify({'success': False, 'errors': errors}), 400
 
 
 @app.route('/roll_tracker')
