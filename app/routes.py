@@ -44,7 +44,9 @@ def job_setup():
 
 @app.route('/get_label_sizes/<customer>', methods=['GET'])
 def get_label_sizes(customer):
+    app.logger.info(f"Received request for label sizes for customer: {customer}")
     sizes = CUSTOMER_LABEL_SIZES.get(customer, [])
+    app.logger.info(f"Returning sizes: {sizes}")
     return jsonify(sizes)
 
 def send_serial_update(new_serial):

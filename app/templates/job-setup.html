@@ -8,7 +8,7 @@
 
         <div class="mbq-4">
             <label for="customer" class="block text-lg font-medium">Select Customer:</label>
-            {{ form.customer(class="border border-gray-300 p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500") }}
+            {{ form.customer(id="customer",class="border border-gray-300 p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500") }}
             {% for error in form.customer.errors %}
                 <span class="text-red-500 text-sm">{{ error }}</span>
             {% endfor %}
@@ -16,7 +16,7 @@
 
         <div class="mb-4">
             <label for="label_size" class="block text-lg font-medium">Select Label Size:</label>
-            {{ form.label_size(class="border border-gray-300 p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500") }}
+            {{ form.label_size(id="label_size", class="border border-gray-300 p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500") }}
             {% for error in form.label_size.errors %}
                 <span class="text-red-500 text-sm">{{ error }}</span>
             {% endfor %}
@@ -62,7 +62,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script type="text/javascript" charset="utf-8">
-        document.addEventListener('DOMContentLoadedd', function() {
+        document.addEventListener('DOMContentLoaded', function() {
             const customerSelect = document.getElementById('customer');
             const labelSizeSelect = document.getElementById('label_size');
             
