@@ -1,6 +1,6 @@
 from flask_socketio import emit
 from app import socketio
-from flask import render_template, flash, redirect, request, url_for
+from flask import render_template, flash, redirect, request, url_for, jsonify
 from app import app
 from app.forms import DatabaseForm 
 from app.models import serialNumber
@@ -11,6 +11,11 @@ from flask import send_file
 import openpyxl
 from utils import helpers
 
+CUSTOMER_LABEL_SIZES = {
+    'Customer A': ['4x6', '4x4', '2x3'],
+    'Customer B': ['6x4', '3x2', '2x1'],
+    'Customer C': ['8x6', '5x3', '4x2'],
+}
 
 @app.route('/')
 @app.route('/index')
@@ -23,14 +28,24 @@ def Home():
 @app.route('/job-setup', methods=['GET', 'POST'])
 def job_setup():
 
-    customers = ['All Barcodes Systems']
+    customers = list(CUSTOMER_LABEL_SIZES.keys())
 
     form = DatabaseForm(request.form)
-    
+    form.customer.choices = [('', 'Select a customer (optional)')] + [(c, c) for c in customers]
+    form.label_size.choices = [('', 'Select a label size (optional)')]
+
+
     current_serial = db.session.scalar(select(serialNumber.CurrentSerial))
     form.serial.data = current_serial 
 
+    
     return render_template('job-setup.html', title='Job Setup', form=form, customers=customers)
+
+
+@app.route('/get_label_sizes/<customer>', methods=['GET'])
+def get_label_sizes(customer):
+    sizes = CUSTOMER_LABEL_SIZES.get(customer, [])
+    return jsonify(sizes)
 
 def send_serial_update(new_serial):
     socketio.emit('update_serial', {'new_serial': new_serial})
